@@ -152,8 +152,15 @@ static void *dp_thread(void *arg)
     /*
      * Grab both chopsticks: ASYMMETRIC and WAITER SOLUTION
      */
-    pthread_mutex_lock(left_chop(me));
-    pthread_mutex_lock(right_chop(me));
+    pthread_mutex_lock(&waiter);
+    
+    while(!(left_chop_available(me) && right_chop_available(me))) {
+    	pthread_cond_wait(&(me->can_eat), &waiter);
+    }
+    available_chopsticks[*left_chop_available(me)] = 0;
+    available_chopsticks[*right_chop_available(me)] = 0;
+    
+    pthread_mutex_unlock(&waiter);
 
     /*
      * Eat some random amount of food. Again, this involves a
@@ -167,8 +174,11 @@ static void *dp_thread(void *arg)
     /*
      * Release both chopsticks: WAITER SOLUTION
      */
-    pthread_mutex_unlock(right_chop(me));
-    pthread_mutex_unlock(left_chop(me));
+    pthread_mutex_lock(&waiter);
+    available_chopsticks[*left_chop_available(me)] = 1;
+    available_chopsticks[*right_chop_available(me)] = 1;
+    pthread_cond_broadcast(&(me->can_eat));
+    pthread_mutex_unlock(&waiter);
 
     /* 
      * Update my progress in current session and for all time.
